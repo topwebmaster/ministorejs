@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MiniStore Tests</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .test-result {
+            margin-bottom: 10px;
+            padding: 10px;
+            border-radius: 4px;
+        }
+        .success {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        .failure {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+        h2 {
+            margin-top: 30px;
+        }
+        pre {
+            background-color: #f5f5f5;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>MiniStore Tests</h1>
+    <div id="test-results"></div>
+
+    <script src="ministore.js"></script>
+    <script>
+        // Test runner
+        function runTests() {
+            const results = [];
+            let passCount = 0;
+            let failCount = 0;
+
+            function assert(condition, message) {
+                if (condition) {
+                    results.push({ success: true, message });
+                    passCount++;
+                } else {
+                    results.push({ success: false, message });
+                    failCount++;
+                }
+            }
+
+            // Test 1: Basic store creation
+            try {
+                const store = MiniStore.create(() => ({ count: 0 }));
+                assert(store.getState().count === 0, "Test 1: Store should be created with initial state");
+            } catch (e) {
+                assert(false, `Test 1 failed with error: ${e.message}`);
+            }
+
+            // Test 2: State updates
+            try {
+                const store = MiniStore.create(() => ({ count: 0 }));
+                store.setState({ count: 5 });
+                assert(store.getState().count === 5, "Test 2: setState should update the state");
+            } catch (e) {
+                assert(false, `Test 2 failed with error: ${e.message}`);
+            }
+
+            // Test 3: Function updates
+            try {
+                const store = MiniStore.create(() => ({ count: 0 }));
+                store.setState(state => ({ count: state.count + 10 }));
+                assert(store.getState().count === 10, "Test 3: setState with function should update based on current state");
+            } catch (e) {
+                assert(false, `Test 3 failed with error: ${e.message}`);
+            }
+
+            // Test 4: Replace state
+            try {
+                const store = MiniStore.create(() => ({ count: 0, name: "test" }));
+                store.setState({ value: 100 }, true);
+                const state = store.getState();
+                assert(state.value === 100 && state.count === undefined, 
+                    "Test 4: setState with replace=true should replace the entire state");
+            } catch (e) {
+                assert(false, `Test 4 failed with error: ${e.message}`);
+            }
+
+            // Test 5: Subscriptions
+            try {
+                const store = MiniStore.create(() => ({ count: 0 }));
+                let callCount = 0;
+                let lastState = null;
+                let lastPrevState = null;
+                
+                const unsubscribe = store.subscribe((state, prevState) => {
+                    callCount++;
+                    lastState = state;
+                    lastPrevState = prevState;
+                });
+                
+                store.setState({ count: 5 });
+                assert(callCount === 1, "Test 5.1: Subscribe callback should be called on state change");
+                assert(lastState.count === 5, "Test 5.2: Subscribe callback should receive new state");
+                assert(lastPrevState.count === 0, "Test 5.3: Subscribe callback should receive previous state");
+                
+                unsubscribe();
+                store.setState({ count: 10 });
+                assert(callCount === 1, "Test 5.4: Unsubscribe should prevent further callback calls");
+            } catch (e) {
+                assert(false, `Test 5 failed with error: ${e.message}`);
+            }
+
+            // Test 6: Custom actions
+            try {
+                const store = MiniStore.create((set) => ({
+                    count: 0,
+                    increment: () => set(state => ({ count: state.count + 1 })),
+                    add: (n) => set(state => ({ count: state.count + n }))
+                }));
+                
+                store.increment();
+                assert(store.getState().count === 1, "Test 6.1: Custom actions should be callable directly");
+                
+                store.add(5);
+                assert(store.getState().count === 6, "Test 6.2: Custom actions should accept parameters");
+            } catch (e) {
+                assert(false, `Test 6 failed with error: ${e.message}`);
+            }
+
+            // Test 7: Shallow equality check
+            try {
+                const store = MiniStore.create(() => ({ count: 0 }));
+                let callCount = 0;
+                
+                store.subscribe(() => {
+                    callCount++;
+                });
+                
+                // This should not trigger an update (same value)
+                store.setState({ count: 0 });
+                assert(callCount === 0, "Test 7.1: No update should occur when state doesn't change");
+                
+                // This should trigger an update
+                store.setState({ count: 1 });
+                assert(callCount === 1, "Test 7.2: Update should occur when state changes");
+            } catch (e) {
+                assert(false, `Test 7 failed with error: ${e.message}`);
+            }
+
+            // Test 8: Destroy
+            try {
+                const store = MiniStore.create(() => ({ count: 0 }));
+                let callCount = 0;
+                
+                store.subscribe(() => {
+                    callCount++;
+                });
+                
+                store.destroy();
+                store.setState({ count: 5 });
+                assert(callCount === 0, "Test 8: destroy should remove all listeners");
+            } catch (e) {
+                assert(false, `Test 8 failed with error: ${e.message}`);
+            }
+
+            // Display results
+            const resultsContainer = document.getElementById('test-results');
+            resultsContainer.innerHTML = `
+                <h2>Summary</h2>
+                <p>Total tests: ${passCount + failCount}</p>
+                <p>Passed: ${passCount}</p>
+                <p>Failed: ${failCount}</p>
+                <h2>Details</h2>
+            `;
+
+            results.forEach((result, index) => {
+                const resultElement = document.createElement('div');
+                resultElement.className = `test-result ${result.success ? 'success' : 'failure'}`;
+                resultElement.textContent = result.message;
+                resultsContainer.appendChild(resultElement);
+            });
+        }
+
+        // Run tests when page loads
+        window.onload = runTests;
+    </script>
+</body>
+</html>

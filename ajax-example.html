@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MiniStore AJAX Example</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .container {
+            margin-bottom: 30px;
+        }
+        .card {
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 15px;
+            margin-bottom: 15px;
+        }
+        .loading {
+            color: #666;
+            font-style: italic;
+        }
+        .error {
+            color: #d9534f;
+            background-color: #f9f2f2;
+            padding: 10px;
+            border-radius: 4px;
+            margin-bottom: 15px;
+        }
+        button {
+            padding: 8px 16px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+        button:hover {
+            background-color: #0069d9;
+        }
+        input, textarea {
+            padding: 8px;
+            margin-bottom: 10px;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        pre {
+            background-color: #f5f5f5;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>MiniStore AJAX Example</h1>
+    
+    <div class="container">
+        <h2>Posts</h2>
+        <div>
+            <button id="fetch-posts">Fetch Posts</button>
+            <button id="clear-posts">Clear Posts</button>
+        </div>
+        <div id="posts-loading" class="loading" style="display: none;">Loading posts...</div>
+        <div id="posts-error" class="error" style="display: none;"></div>
+        <div id="posts-container"></div>
+    </div>
+    
+    <div class="container">
+        <h2>Create New Post</h2>
+        <div class="form-group">
+            <label for="post-title">Title:</label>
+            <input type="text" id="post-title" placeholder="Enter post title">
+        </div>
+        <div class="form-group">
+            <label for="post-body">Body:</label>
+            <textarea id="post-body" rows="4" placeholder="Enter post content"></textarea>
+        </div>
+        <button id="create-post">Create Post</button>
+        <div id="create-loading" class="loading" style="display: none;">Creating post...</div>
+        <div id="create-error" class="error" style="display: none;"></div>
+        <div id="create-success" style="display: none;">
+            <h3>Post Created Successfully:</h3>
+            <pre id="create-result"></pre>
+        </div>
+    </div>
+    
+    <div class="container">
+        <h2>Current State</h2>
+        <pre id="state-display"></pre>
+    </div>
+
+    <!-- Include the MiniStore library -->
+    <script src="ministore.js"></script>
+    
+    <script>
+        // Create a store for posts
+        const usePostsStore = MiniStore.create((set) => ({
+            posts: [],
+            loading: false,
+            error: null,
+            
+            // Fetch posts from JSONPlaceholder API
+            fetchPosts: () => {
+                set({ loading: true, error: null });
+                
+                MiniStore.get('https://jsonplaceholder.typicode.com/posts?_limit=5')
+                    .then(posts => {
+                        set({ posts, loading: false });
+                    })
+                    .catch(error => {
+                        set({ 
+                            error: typeof error === 'string' ? error : 
+                                  (error.statusText || 'Failed to fetch posts'), 
+                            loading: false 
+                        });
+                    });
+            },
+            
+            // Clear posts
+            clearPosts: () => set({ posts: [] }),
+            
+            // Create a new post
+            createPost: (title, body) => {
+                set(state => ({ 
+                    loading: true, 
+                    error: null,
+                    newPost: null
+                }));
+                
+                MiniStore.post('https://jsonplaceholder.typicode.com/posts', {
+                    title,
+                    body,
+                    userId: 1 // Dummy user ID for the example
+                })
+                    .then(newPost => {
+                        set(state => ({ 
+                            posts: [newPost, ...state.posts],
+                            loading: false,
+                            newPost
+                        }));
+                    })
+                    .catch(error => {
+                        set({ 
+                            error: typeof error === 'string' ? error : 
+                                  (error.statusText || 'Failed to create post'), 
+                            loading: false 
+                        });
+                    });
+            }
+        }));
+        
+        // Update UI functions
+        function updatePostsUI() {
+            const state = usePostsStore.getState();
+            const postsContainer = document.getElementById('posts-container');
+            const loadingElement = document.getElementById('posts-loading');
+            const errorElement = document.getElementById('posts-error');
+            
+            // Update loading state
+            loadingElement.style.display = state.loading ? 'block' : 'none';
+            
+            // Update error state
+            if (state.error) {
+                errorElement.textContent = state.error;
+                errorElement.style.display = 'block';
+            } else {
+                errorElement.style.display = 'none';
+            }
+            
+            // Update posts list
+            if (state.posts.length > 0) {
+                postsContainer.innerHTML = state.posts.map(post => `
+                    <div class="card">
+                        <h3>${post.title}</h3>
+                        <p>${post.body}</p>
+                    </div>
+                `).join('');
+            } else {
+                postsContainer.innerHTML = '<p>No posts to display. Click "Fetch Posts" to load some posts.</p>';
+            }
+            
+            // Update state display
+            document.getElementById('state-display').textContent = JSON.stringify(state, null, 2);
+        }
+        
+        function updateCreateUI() {
+            const state = usePostsStore.getState();
+            const loadingElement = document.getElementById('create-loading');
+            const errorElement = document.getElementById('create-error');
+            const successElement = document.getElementById('create-success');
+            const resultElement = document.getElementById('create-result');
+            
+            // Update loading state
+            loadingElement.style.display = state.loading ? 'block' : 'none';
+            
+            // Update error state
+            if (state.error) {
+                errorElement.textContent = state.error;
+                errorElement.style.display = 'block';
+                successElement.style.display = 'none';
+            } else {
+                errorElement.style.display = 'none';
+            }
+            
+            // Update success state
+            if (state.newPost) {
+                resultElement.textContent = JSON.stringify(state.newPost, null, 2);
+                successElement.style.display = 'block';
+            }
+        }
+        
+        // Subscribe to store changes
+        usePostsStore.subscribe(updatePostsUI);
+        usePostsStore.subscribe(updateCreateUI);
+        
+        // Initialize UI
+        updatePostsUI();
+        updateCreateUI();
+        
+        // Add event listeners
+        document.getElementById('fetch-posts').addEventListener('click', () => {
+            usePostsStore.fetchPosts();
+        });
+        
+        document.getElementById('clear-posts').addEventListener('click', () => {
+            usePostsStore.clearPosts();
+        });
+        
+        document.getElementById('create-post').addEventListener('click', () => {
+            const title = document.getElementById('post-title').value.trim();
+            const body = document.getElementById('post-body').value.trim();
+            
+            if (!title || !body) {
+                alert('Please enter both title and body for the post');
+                return;
+            }
+            
+            usePostsStore.createPost(title, body);
+            
+            // Clear form
+            document.getElementById('post-title').value = '';
+            document.getElementById('post-body').value = '';
+        });
+    </script>
+</body>
+</html>

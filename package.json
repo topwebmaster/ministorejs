@@ -1,0 +1,25 @@
+{
+  "name": "ministorejs",
+  "version": "0.0.1",
+  "description": "Browser oriented state management library with very minimalistic approach",
+  "main": "ministore.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/topwebmaster/ministorejs.git"
+  },
+  "keywords": [
+    "javascript",
+    "library",
+    "state",
+    "management"
+  ],
+  "author": "Dmitriy Petrov",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/topwebmaster/ministorejs/issues"
+  },
+  "homepage": "https://github.com/topwebmaster/ministorejs#readme"
+}

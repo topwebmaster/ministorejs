@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MiniStore Example</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .counter {
+            display: flex;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        button {
+            padding: 8px 16px;
+            margin: 0 5px;
+            cursor: pointer;
+        }
+        .count {
+            font-size: 24px;
+            margin: 0 15px;
+            min-width: 40px;
+            text-align: center;
+        }
+        .todo-list {
+            margin-top: 30px;
+        }
+        .todo-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .todo-item input[type="checkbox"] {
+            margin-right: 10px;
+        }
+        .todo-item.completed span {
+            text-decoration: line-through;
+            color: #888;
+        }
+        .todo-input {
+            display: flex;
+            margin-bottom: 20px;
+        }
+        .todo-input input {
+            flex-grow: 1;
+            padding: 8px;
+            margin-right: 10px;
+        }
+        .state-display {
+            background-color: #f5f5f5;
+            padding: 15px;
+            border-radius: 5px;
+            margin-top: 20px;
+        }
+        pre {
+            margin: 0;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body>
+    <h1>MiniStore Example</h1>
+
+    <h2>Counter Example</h2>
+    <div class="counter">
+        <button id="decrement">-</button>
+        <div id="counter" class="count">0</div>
+        <button id="increment">+</button>
+        <button id="reset">Reset</button>
+    </div>
+
+    <h2>Todo List Example</h2>
+    <div class="todo-input">
+        <input type="text" id="new-todo" placeholder="Add a new todo...">
+        <button id="add-todo">Add</button>
+    </div>
+    <div id="todo-list" class="todo-list"></div>
+
+    <div class="state-display">
+        <h3>Current State:</h3>
+        <pre id="state-json"></pre>
+    </div>
+
+    <!-- Include the MiniStore library -->
+    <script src="ministore.js"></script>
+
+    <script>
+        // Create a counter store
+        const useCounterStore = MiniStore.create((set) => ({
+            count: 0,
+            increment: () => set(state => ({ count: state.count + 1 })),
+            decrement: () => set(state => ({ count: state.count - 1 })),
+            reset: () => set({ count: 0 })
+        }));
+
+        // Create a todo list store
+        const useTodoStore = MiniStore.create((set) => ({
+            todos: [],
+            addTodo: (text) => set(state => ({
+                todos: [...state.todos, { id: Date.now(), text, completed: false }]
+            })),
+            toggleTodo: (id) => set(state => ({
+                todos: state.todos.map(todo => 
+                    todo.id === id ? { ...todo, completed: !todo.completed } : todo
+                )
+            })),
+            removeTodo: (id) => set(state => ({
+                todos: state.todos.filter(todo => todo.id !== id)
+            }))
+        }));
+
+        // Update UI functions
+        function updateCounterUI() {
+            document.getElementById('counter').textContent = useCounterStore.getState().count;
+            updateStateDisplay();
+        }
+
+        function updateTodoUI() {
+            const todoList = document.getElementById('todo-list');
+            const { todos } = useTodoStore.getState();
+
+            todoList.innerHTML = '';
+
+            todos.forEach(todo => {
+                const todoItem = document.createElement('div');
+                todoItem.className = `todo-item ${todo.completed ? 'completed' : ''}`;
+
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.checked = todo.completed;
+                checkbox.addEventListener('change', () => {
+                    useTodoStore.toggleTodo(todo.id);
+                });
+
+                const text = document.createElement('span');
+                text.textContent = todo.text;
+
+                const removeButton = document.createElement('button');
+                removeButton.textContent = 'Remove';
+                removeButton.style.marginLeft = 'auto';
+                removeButton.addEventListener('click', () => {
+                    useTodoStore.removeTodo(todo.id);
+                });
+
+                todoItem.appendChild(checkbox);
+                todoItem.appendChild(text);
+                todoItem.appendChild(removeButton);
+                todoList.appendChild(todoItem);
+            });
+
+            updateStateDisplay();
+        }
+
+        function updateStateDisplay() {
+            const stateJson = document.getElementById('state-json');
+            const state = {
+                counter: useCounterStore.getState(),
+                todos: useTodoStore.getState()
+            };
+            stateJson.textContent = JSON.stringify(state, null, 2);
+        }
+
+        // Subscribe to store changes
+        useCounterStore.subscribe(updateCounterUI);
+        useTodoStore.subscribe(updateTodoUI);
+
+        // Initialize UI
+        updateCounterUI();
+        updateTodoUI();
+
+        // Add event listeners
+        document.getElementById('increment').addEventListener('click', () => {
+            useCounterStore.increment();
+        });
+
+        document.getElementById('decrement').addEventListener('click', () => {
+            useCounterStore.decrement();
+        });
+
+        document.getElementById('reset').addEventListener('click', () => {
+            useCounterStore.reset();
+        });
+
+        document.getElementById('add-todo').addEventListener('click', () => {
+            const input = document.getElementById('new-todo');
+            const text = input.value.trim();
+
+            if (text) {
+                useTodoStore.addTodo(text);
+                input.value = '';
+            }
+        });
+
+        document.getElementById('new-todo').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                document.getElementById('add-todo').click();
+            }
+        });
+    </script>
+</body>
+</html>
